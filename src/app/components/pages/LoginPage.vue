@@ -5,6 +5,8 @@ import { AuthenticationService } from "@/modules/authentication/services";
 import { ElMessage } from "element-plus";
 import { useProvider } from "@/app/platform";
 import type { FormInstance, FormRules } from "element-plus";
+import { valid } from "node-html-parser";
+import type { LoginModel } from "@/modules/authentication/models";
 
 const [authService] = useProvider([AuthenticationService]);
 const router = useRouter();
@@ -18,10 +20,20 @@ const userNameRegex = /^(\w+)$/i;
 
 const loginFormRules = reactive<FormRules>({
   username: [
-  
+    {
+      required: true,
+      message: "Pseudo obligatoire",
+    },
+    {
+      pattern: userNameRegex,
+      message: "Format invalide",
+    }
   ],
   password: [
-  
+    {
+      required: true,
+      message: "Mot de passe obligatoire",
+    }
   ]
 });
 
@@ -31,7 +43,22 @@ async function onSubmit(form?: FormInstance) {
   }
 
   try {
-    await form.validate();
+    await form.validate().then(async valid => {
+      if (!valid) {
+        return;
+      }
+      const loginData: LoginModel = {
+        username: form.$props.model?.username,
+        password: form.$props.model?.password,
+      };
+      const isLogin = await authService.authenticate(loginData);
+      if (isLogin) {
+        router.push('/app');
+      }
+      else {
+        ElMessage.error("Les identifiants ne sont pas corrects");
+      }
+    });
 
   } catch (e) {
     return;
@@ -50,12 +77,14 @@ async function onSubmit(form?: FormInstance) {
           :rules="loginFormRules"
           label-position="top"
           class="login-form"
-          @submit.prevent=""
+          @submit.prevent="onSubmit($refs.form)"
         >
-          <el-form-item label="Pseudo" prop="username"> </el-form-item>
-
-          <el-form-item label="Mot de passe" prop="password"> </el-form-item>
-
+          <el-form-item label="Pseudo" prop="username"> 
+            <el-input v-model="loginModel.username" />
+          </el-form-item>
+          <el-form-item label="Mot de passe" prop="password">
+            <el-input type="password" v-model="loginModel.password" />
+          </el-form-item>
           <el-form-item>
             <div class="form-actions">
               <el-button type="primary" native-type="submit">Connexion</el-button>

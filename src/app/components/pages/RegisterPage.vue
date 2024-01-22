@@ -6,6 +6,7 @@ import { UserAPI } from "@/modules/user/services";
 import { AuthenticationService } from "@/modules/authentication/services";
 import { useProvider } from "@/app/platform";
 import type { FormRules, FormInstance } from "element-plus";
+import type { UserRegistrationModel } from "@/modules/user/models";
 
 const [userApi, authService] = useProvider([UserAPI, AuthenticationService]);
 const router = useRouter();
@@ -22,11 +23,26 @@ const registerFormRules = reactive<FormRules>({
   username: [
     {
       required: true,
-      message: "Pseudo obligatoire"
+      message: "Pseudo obligatoire",
+    },
+    {
+      message: "Format invalide",
+      pattern: userNameRegex,
+      
     }
   ],
-  password: [],
-  passwordConfirmation: []
+  password: [
+    {
+      required: true,
+      message: "Mot de passe obligatoire"
+    }
+  ],
+  passwordConfirmation: [
+    {
+      required: true,
+      message: "Confirmation du mot de passe obligatoire"
+    }
+  ]
 });
 
 async function onSubmit(form?: FormInstance) {
@@ -35,7 +51,34 @@ async function onSubmit(form?: FormInstance) {
   }
 
   try {
-    await form.validate();
+    await form.validate().then(async valid => {
+      if (!valid) {
+        return;
+      }
+      if (form.$props.model?.password !== form.$props.model?.passwordConfirmation) {
+        ElMessage.error("Les mots de passe ne sont pas identiques");
+        return;
+      }
+      const usernameExists = await userApi.exists(form.$props.model?.username);
+      if (usernameExists) {
+        ElMessage.error("Le nom d'utilisateur existe déjà");
+        return;
+      }
+      const registrationData: UserRegistrationModel = {
+        username: form.$props.model?.username,
+        password: form.$props.model?.password,
+      };
+      userApi.register(registrationData).then(() => {
+        ElMessage({
+          message: 'Votre compte a été créé',
+          type: 'success',
+        });
+        router.push('/login');
+      })
+        .catch(() => {
+          ElMessage.error("Une erreur est survenu lors de l'inscription du compte");
+        });
+    });
   } catch (e) {
     return;
   }
@@ -59,9 +102,13 @@ async function onSubmit(form?: FormInstance) {
             <el-input v-model="registerModel.username" />
           </el-form-item>
 
-          <el-form-item label="Mot de passe" prop="password"> </el-form-item>
+          <el-form-item label="Mot de passe" prop="password">
+            <el-input type="password" v-model="registerModel.password" />
+          </el-form-item>
 
           <el-form-item label="Confirmez votre mot de passe" prop="passwordConfirmation">
+            <el-input type="password" v-model="registerModel.passwordConfirmation" />
+
           </el-form-item>
 
           <el-form-item>
